@@ -24,11 +24,6 @@ router.post('/', function (req, res, next) {
     return
   }
 
-  if (req.body.history.length > 30) {
-    res.status(HttpStatus.LENGTH_REQUIRED).send("Only 30 days of history are allowed")
-    return
-  }
-
   // Adding new history to the database
   new dal().add_history(req.body, function (data) {
     res.status(HttpStatus.OK).send(data)
