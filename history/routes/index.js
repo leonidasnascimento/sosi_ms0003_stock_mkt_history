@@ -19,11 +19,6 @@ router.post('/', function (req, res, next) {
     return
   }
 
-  if (req.body.history.length === 0) {
-    res.status(HttpStatus.LENGTH_REQUIRED).send("No history to process")
-    return
-  }
-
   // Adding new history to the database
   new dal().add_history(req.body, function (data) {
     res.status(HttpStatus.OK).send(data)
