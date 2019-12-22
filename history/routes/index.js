@@ -5,7 +5,15 @@ var dal = require("../data/dal_mkt_history");
 
 /* GET home page. */
 router.get('/', function (req, res, next) {
-  res.status(HttpStatus.NOT_IMPLEMENTED).send("Not implemented")
+  if ((Object.keys(req.query).length === 0) || (Object.keys(req.query).indexOf("code") < 0)) {
+    res.status(HttpStatus.EXPECTATION_FAILED).send("Stock code not informed")
+  }
+
+  new dal().get_history(req.query["code"], function (data) {
+    res.status(HttpStatus.OK).send(data);
+  }, function (data) {
+    res.status(HttpStatus.METHOD_FAILURE).send(data)
+  });
 });
 
 router.post('/', function (req, res, next) {
