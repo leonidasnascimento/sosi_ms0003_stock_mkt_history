@@ -2,6 +2,8 @@ var express = require('express');
 var router = express.Router();
 var HttpStatus = require('http-status-codes');
 var dal = require("../data/dal_mkt_history");
+const cacheDb = require("sosi_cache_db_manager");
+const cacheDbKey_DividendAnalysis = "sosi_ms0003_stock_mkt_history.dividend_analysis"
 
 /* FUNCTIONS */
 
@@ -48,6 +50,32 @@ var getAvarageResult = function (input_json_arr, column_name) {
 
   calc_result = values_sum / (found_values_count > 0 ? found_values_count : 1)
   return calc_result
+}
+
+var getDividendAnalysisData = function (data) {
+  if (data === undefined || data === null) {
+    return undefined;
+  }
+
+  let adjusted_close_aux = 0.00
+  let last_price_aux = getLastPrice(data);
+  let volume_aux = getAvarageResult(data.history, "volume")
+
+  if (last_price_aux === undefined || last_price_aux === null || last_price_aux === {}) {
+    adjusted_close_aux = 0.00
+  } else if (!('adjusted_close' in last_price_aux)) {
+    adjusted_close_aux = 0.00
+  } else {
+    adjusted_close_aux = last_price_aux.adjusted_close
+  }
+
+  let result_json = {
+    code: data.code,
+    last_price: adjusted_close_aux,
+    volume: volume_aux,
+  }
+
+  return result_json
 }
 
 router.get('/', function (req, res, next) {
@@ -105,6 +133,59 @@ router.post('/', function (req, res, next) {
   }, function (data) {
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(data)
   })
+});
+
+/* **********************************
+
+  DIVIDEND ANALYSIS ENDPOINT SECTION
+
+************************************* */
+
+router.get('/dividend_analysis', function (req, res, next) {
+  var cacheDbMngr = new cacheDb(cacheDbKey_DividendAnalysis)
+
+  //Trying to get data from Redis
+  cacheDbMngr.getValue(function (obj) {
+    if (obj.data !== null) {
+      console.log("FROM REDIS...")
+      res.status(HttpStatus.OK).send(JSON.parse(obj.data));
+    } else {
+      //Going to main db to retrieve the data if some error occurr when getting from Redis
+      new dal()
+        .get_all_history(function (data) {
+          var result = getDividendAnalysisData(data)
+          res.status(HttpStatus.OK).send(result);
+        }, function (data) {
+          res.status(HttpStatus.METHOD_FAILURE).send(data);
+        });
+    }
+  }, function (obj) {
+    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(obj);
+  })
+});
+
+router.put('/dividend_analysis', function (req, res, next) {
+  new dal().get_all_history(function (data) {
+    var cacheDbMngr = new cacheDb(cacheDbKey_DividendAnalysis)
+    var lstData = []
+
+    if (data === null || data === undefined) {
+      res.status(HttpStatus.EXPECTATION_FAILED).send("No data");
+    } else {
+      data.forEach(d => {
+        var result = getDividendAnalysisData(d)
+        lstData.push(result);
+      })
+
+      cacheDbMngr.setValue(lstData, function (obj) {
+        res.status(HttpStatus.OK).send(obj)
+      }, function (error) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(error)
+      });
+    }
+  }, function (data) {
+    res.status(HttpStatus.METHOD_FAILURE).send(data)
+  });
 });
 
 module.exports = router;

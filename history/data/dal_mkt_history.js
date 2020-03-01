@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const mock = require('./mock.json');
 const db_collection = 'stock_mkt_history'
 
 let service_account = require('../sosi_gcp_nosql_service_account.json');
@@ -28,6 +29,25 @@ module.exports = class {
             .get()
             .then((doc) => {
                 on_success(doc.data())
+            })
+            .catch((err) => {
+                on_error('Error getting documents => ' + err)
+            });
+    }
+
+    get_all_history(on_success, on_error) {
+        this.initialize_app();
+        let data = [];
+
+        admin.firestore().collection(db_collection)
+            .get()
+            .then(doc => {
+
+                doc.docs.forEach(d => {
+                    data.push(d.data());
+                })
+
+                on_success(data)
             })
             .catch((err) => {
                 on_error('Error getting documents => ' + err)
